@@ -566,6 +566,24 @@ Http& Http::direct_no_redirects()
     return *this;
 }
 
+Http& Http::secure_public_download()
+{
+    if (p) {
+        curl_slist_free_all(p->headerlist);
+        p->headerlist = nullptr;
+        curl_easy_setopt(p->curl, CURLOPT_SSL_VERIFYPEER, 1L);
+        curl_easy_setopt(p->curl, CURLOPT_SSL_VERIFYHOST, 2L);
+#ifdef __APPLE__
+        // The vendored curl uses OpenSSL, not Apple's native TLS backend.
+        curl_easy_setopt(p->curl, CURLOPT_CAINFO, "/etc/ssl/cert.pem");
+#endif
+        curl_easy_setopt(p->curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+        curl_easy_setopt(p->curl, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTPS);
+        curl_easy_setopt(p->curl, CURLOPT_MAXREDIRS, 5L);
+    }
+    return *this;
+}
+
 Http& Http::size_limit(size_t sizeLimit)
 {
 	if (p) { p->limit = sizeLimit; }

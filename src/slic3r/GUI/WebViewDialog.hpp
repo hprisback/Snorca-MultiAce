@@ -32,6 +32,7 @@ class NetworkAgent;
 
 namespace GUI {
 
+class MakerWorldPanel;
 
 class WebViewPanel : public wxPanel
 {
@@ -104,12 +105,15 @@ public:
     int  get_model_mall_detail_url(std::string *url, std::string id);
 
     void update_mode();
+    void show_makerworld(bool show = true);
 
     wxWebView* getWebView() { return m_browser; }
 
 private:
 
     wxWebView* m_browser;
+    MakerWorldPanel* m_makerworld{nullptr};
+    bool             m_show_makerworld{true};
     wxBoxSizer *bSizer_toolbar;
     wxButton *  m_button_back;
     wxButton *  m_button_forward;

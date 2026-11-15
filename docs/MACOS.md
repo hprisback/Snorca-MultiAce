@@ -3,6 +3,26 @@
 This fork adds an experimental macOS build of the full Snorca slicer. It does
 not include the optional ACE touch-screen label installer.
 
+## MakerWorld model library
+
+The Home tab opens MakerWorld's Studio-compatible model library. Choose a
+model and use **Download and open** (or **Open in Bambu Studio** inside this
+embedded view) to download it into Snorca. The bridge accepts MakerWorld and
+its known model CDNs, saves into `Downloads/MakerWorld` (or your configured
+download folder), then opens 3MF projects or imports supported model files.
+It does not register itself as the system-wide handler for Bambu Studio links.
+
+Use **My projects / Snapmaker** for the original local home screen. MakerWorld
+uses its own web login, not your Snapmaker account. If login, a CAPTCHA, or a
+site change blocks an embedded download, use **Open in browser**, download the
+file there, and select **Open downloaded file** inside Snorca. Raw blob-based
+web downloads may require that fallback. Live MakerWorld login and downloads
+must still be verified on a Mac.
+
+Bambu printer/AMS profiles are not converted to U1 settings. When importing a
+3MF, prefer geometry-only import or review the printer, filament assignments,
+bed size and process settings before slicing and printing.
+
 ## Download a completed build
 
 Open this fork's **Actions → Build Snorca for Mac**, select a successful run,

@@ -7,6 +7,7 @@
 #include "sentry_wrapper/SentryWrapper.hpp"
 #include "../Utils/Http.hpp"
 #include "SSWCP.hpp"
+#include "ModelMall.hpp"
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
@@ -86,6 +87,14 @@ WebViewPanel::WebViewPanel(wxWindow *parent)
     // Create the info panel
     m_info = new wxInfoBar(this);
     topsizer->Add(m_info, wxSizerFlags().Expand());
+    auto home_tabs       = new wxBoxSizer(wxHORIZONTAL);
+    auto models_button   = new wxButton(this, wxID_ANY, "MakerWorld");
+    auto projects_button = new wxButton(this, wxID_ANY, _L("My projects / Snapmaker"));
+    home_tabs->Add(models_button, 0, wxALL, FromDIP(5));
+    home_tabs->Add(projects_button, 0, wxALL, FromDIP(5));
+    topsizer->Add(home_tabs, 0, wxEXPAND);
+    models_button->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { show_makerworld(); });
+    projects_button->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { show_makerworld(false); });
     // Create the webview
     m_browser = WebView::CreateWebView(this, url);
 
@@ -99,6 +108,8 @@ WebViewPanel::WebViewPanel(wxWindow *parent)
     SetSizer(topsizer);
 
     topsizer->Add(m_browser, wxSizerFlags().Expand().Proportion(1));
+    m_makerworld = new MakerWorldPanel(this);
+    topsizer->Add(m_makerworld, 1, wxEXPAND);
 
     // Log backend information
     /* m_browser->GetUserAgent() may lead crash
@@ -253,7 +264,7 @@ void WebViewPanel::reload() {
 
 void WebViewPanel::load_url(wxString& url)
 {
-
+    show_makerworld(false);
     m_browser->LoadURL(url);
 
     wxGetApp().fltviews().add_webview_panel(this, url);
@@ -549,8 +560,19 @@ int WebViewPanel::get_model_mall_detail_url(std::string *url, std::string id)
 
 void WebViewPanel::update_mode()
 {
-    GetSizer()->Show(size_t(0), wxGetApp().app_config->get("internal_developer_mode") == "true");
+#if !BBL_RELEASE_TO_PUBLIC
+    bSizer_toolbar->Show(wxGetApp().app_config->get("internal_developer_mode") == "true");
+#endif
     GetSizer()->Layout();
+}
+
+void WebViewPanel::show_makerworld(bool show)
+{
+    m_show_makerworld = show;
+    m_browser->Show(!show);
+    if (m_makerworld)
+        m_makerworld->Show(show);
+    Layout();
 }
 
 /**
@@ -603,7 +625,7 @@ void WebViewPanel::OnNavigationRequest(wxWebViewEvent& evt)
     */
 void WebViewPanel::OnNavigationComplete(wxWebViewEvent& evt)
 {
-    m_browser->Show();
+    m_browser->Show(!m_show_makerworld);
     Layout();
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << ": " << evt.GetTarget().ToUTF8().data();
     if (wxGetApp().get_mode() == comDevelop)

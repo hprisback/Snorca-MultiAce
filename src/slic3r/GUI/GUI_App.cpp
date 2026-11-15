@@ -6488,44 +6488,10 @@ void GUI_App::load_url(wxString url)
 
 void GUI_App::open_mall_page_dialog()
 {
-    std::string host_url;
-    std::string model_url;
-    std::string link_url;
-
-    int result = -1;
-
-    //model api url
-    host_url = get_model_http_url(app_config->get_country_code());
-
-    //model url
-
-    wxString language_code = this->current_language_code().BeforeFirst('_');
-    model_url = language_code.ToStdString();
-
-    if (getAgent() && mainframe) {
-
-        //login already
-        if (getAgent()->is_user_login()) {
-            std::string ticket;
-            result = getAgent()->request_bind_ticket(&ticket);
-
-            if(result == 0){
-                link_url = host_url + "api/sign-in/ticket?to=" + host_url + url_encode(model_url) + "&ticket=" + ticket;
-            }
-        }
+    if (mainframe && mainframe->m_webview) {
+        mainframe->select_tab(static_cast<size_t>(MainFrame::TabPosition::tpHome));
+        mainframe->m_webview->show_makerworld();
     }
-
-    if (result < 0) {
-       link_url = host_url + model_url;
-    }
-
-    if (link_url.find("?") != std::string::npos) {
-        link_url += "&from=Snapmaker_Orca";
-    } else {
-        link_url += "?from=Snapmaker_Orca";
-    }
-
-    wxLaunchDefaultBrowser(link_url);
 }
 
 void GUI_App::open_publish_page_dialog()

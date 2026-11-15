@@ -10,9 +10,234 @@
 #include "MainFrame.hpp"
 #include "GUI_App.hpp"
 #include "Plater.hpp"
+#include "slic3r/Utils/MakerWorldUrl.hpp"
+#include "slic3r/Utils/Http.hpp"
+#include <atomic>
+#include <chrono>
+#include <future>
+#include <wx/progdlg.h>
+#include <wx/stdpaths.h>
+#include <boost/filesystem.hpp>
 
 namespace Slic3r {
 namespace GUI {
+MakerWorldPanel::MakerWorldPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY)
+{
+    auto layout      = new wxBoxSizer(wxVERTICAL);
+    auto toolbar     = new wxBoxSizer(wxHORIZONTAL);
+    auto back        = new wxButton(this, wxID_ANY, _L("Back"));
+    auto forward     = new wxButton(this, wxID_ANY, _L("Forward"));
+    auto home        = new wxButton(this, wxID_ANY, "MakerWorld");
+    auto reload      = new wxButton(this, wxID_ANY, _L("Refresh"));
+    auto website     = new wxButton(this, wxID_ANY, _L("Open in browser"));
+    auto import_file = new wxButton(this, wxID_ANY, _L("Open downloaded file"));
+    for (auto button : {back, forward, home, reload, website, import_file})
+        toolbar->Add(button, 0, wxALL, FromDIP(4));
+    layout->Add(toolbar, 0, wxEXPAND);
+    m_status = new wxStaticText(this, wxID_ANY, _L("Download a model, then choose your U1 printer and filament settings before slicing."));
+    layout->Add(m_status, 0, wxEXPAND | wxALL, FromDIP(8));
+    m_view = WebView::CreateWebView(this, "about:blank");
+    layout->Add(m_view, 1, wxEXPAND);
+    SetSizer(layout);
+    back->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        if (m_view->CanGoBack())
+            m_view->GoBack();
+    });
+    forward->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        if (m_view->CanGoForward())
+            m_view->GoForward();
+    });
+    home->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { open_home(); });
+    reload->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { m_view->Reload(); });
+    website->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        const auto url = m_view->GetCurrentURL();
+        wxLaunchDefaultBrowser(MakerWorld::is_page(url.ToStdString()) ? url : wxString("https://makerworld.com/en"));
+    });
+    import_file->Bind(wxEVT_BUTTON, [](wxCommandEvent&) {
+        if (wxGetApp().plater())
+            wxGetApp().plater()->add_model();
+    });
+    m_view->Bind(wxEVT_WEBVIEW_NAVIGATING, &MakerWorldPanel::on_navigation, this);
+    m_view->Bind(wxEVT_WEBVIEW_NEWWINDOW, &MakerWorldPanel::on_new_window, this);
+    m_view->Bind(wxEVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED, &MakerWorldPanel::on_message, this);
+    // Consume remote events here; they must never reach WebViewPanel's
+    // trusted local Flutter handlers or start its account sync timer.
+    m_view->Bind(wxEVT_WEBVIEW_NAVIGATED, [](wxWebViewEvent&) {});
+    m_view->Bind(wxEVT_WEBVIEW_TITLE_CHANGED, [](wxWebViewEvent&) {});
+    m_view->Bind(wxEVT_WEBVIEW_LOADED, [this](wxWebViewEvent&) {
+        m_status->SetLabel(_L("Use Download and open on MakerWorld. Review your printer and filament settings before printing."));
+    });
+    m_view->Bind(wxEVT_WEBVIEW_ERROR, [this](wxWebViewEvent&) {
+        m_status->SetLabel(_L("MakerWorld could not load. Try Refresh or Open in browser, then Open downloaded file."));
+    });
+    CallAfter([this] { open_home(); });
+}
+
+void MakerWorldPanel::open_home()
+{
+    // Public Studio-compatible view, using its documented download bridge.
+    // Login stays in this web session; no Snapmaker credentials are sent.
+    m_view->LoadURL("https://makerworld.com/en/studio/webview?from=bambustudio");
+}
+
+void MakerWorldPanel::on_navigation(wxWebViewEvent& event)
+{
+    const auto url = event.GetURL().ToStdString();
+    if (MakerWorld::is_open_link(url)) {
+        event.Veto();
+        if (MakerWorld::is_page(m_view->GetCurrentURL().ToStdString()))
+            CallAfter([this, url] { download_and_open(url); });
+        return;
+    }
+    auto file_url = url.substr(0, url.find_first_of("?#"));
+    if (MakerWorld::is_download(url) && MakerWorld::supported_file(file_url)) {
+        event.Veto();
+        CallAfter([this, url] { download_and_open(url); });
+        return;
+    }
+    // HTTPS authentication pages may navigate normally, but receive no
+    // native commands. Never execute arbitrary schemes or local file URLs.
+    if (url != "about:blank" && MakerWorld::https_host(url).empty())
+        event.Veto();
+}
+
+void MakerWorldPanel::on_new_window(wxWebViewEvent& event)
+{
+    event.Veto();
+    const auto url = event.GetURL().ToStdString();
+    if (MakerWorld::is_open_link(url)) {
+        if (MakerWorld::is_page(m_view->GetCurrentURL().ToStdString()))
+            CallAfter([this, url] { download_and_open(url); });
+    } else if (!MakerWorld::https_host(url).empty()) {
+        m_view->LoadURL(event.GetURL());
+    }
+}
+
+void MakerWorldPanel::on_message(wxWebViewEvent& event)
+{
+    if (!MakerWorld::is_page(m_view->GetCurrentURL().ToStdString()) || !MakerWorld::is_page(event.GetURL().ToStdString()) ||
+        event.GetString().size() > 65536)
+        return;
+    try {
+        const auto message = json::parse(event.GetString().utf8_string());
+        const auto command = message.value("command", std::string());
+        if (command == "makerworld_model_open") {
+            const auto url = message.at("model").at("url").get<std::string>();
+            CallAfter([this, url] { download_and_open(url); });
+        } else if (command == "common_openurl") {
+            const auto url = message.value("url", std::string());
+            if (MakerWorld::is_open_link(url))
+                CallAfter([this, url] { download_and_open(url); });
+            else if (!MakerWorld::https_host(url).empty())
+                m_view->LoadURL(wxString::FromUTF8(url));
+        } else if (command == "homepage_login_or_register") {
+            // The full website provides its own login; no Bambu cloud plugin required.
+            m_view->LoadURL("https://makerworld.com/en");
+        } else if (command == "homepage_leftmenu_switch") {
+            open_home();
+        }
+    } catch (const std::exception&) {
+        m_status->SetLabel(_L("MakerWorld sent an unsupported request. Try downloading the file and opening it manually."));
+    }
+}
+
+void MakerWorldPanel::download_and_open(const std::string& payload)
+{
+    if (m_downloading || !wxGetApp().plater())
+        return;
+    const auto download = MakerWorld::parse_download(payload);
+    if (!download) {
+        wxMessageBox(_L("This link is not a supported MakerWorld model download."), "MakerWorld", wxOK | wxICON_INFORMATION, this);
+        return;
+    }
+    m_downloading = true;
+    struct ResetFlag
+    {
+        bool& flag;
+        ~ResetFlag() { flag = false; }
+    } reset{m_downloading};
+    try {
+        namespace fs = boost::filesystem;
+        fs::path folder(wxGetApp().app_config->get("download_path"));
+        if (folder.empty() || !fs::is_directory(folder))
+            folder = fs::path(wxStandardPaths::Get().GetUserDir(wxStandardPaths::Dir_Downloads).ToStdWstring());
+        folder /= "MakerWorld";
+        fs::create_directories(folder);
+        const fs::path    destination = folder / fs::unique_path("%%%%-%%%%-%%%%").string().append("-").append(download.name);
+        const fs::path    temporary   = destination.string() + ".download";
+        std::atomic<bool> cancel{false};
+        std::atomic<int>  percent{0};
+        struct Result
+        {
+            bool        ok{false};
+            std::string error;
+        };
+        auto             worker = std::async(std::launch::async, [&cancel, &percent, download, temporary] {
+            Result result;
+            try {
+                auto http = Http::get(download.url);
+                http.secure_public_download()
+                    .size_limit(500 * 1024 * 1024)
+                    .timeout_connect(20)
+                    .timeout_max(300)
+                    .on_progress([&](Http::Progress p, bool& stop) {
+                        stop = cancel.load();
+                        if (p.dltotal)
+                            percent = static_cast<int>(std::min<size_t>(99, 100 * p.dlnow / p.dltotal));
+                    })
+                    .on_error([&](std::string, std::string error, unsigned status) {
+                        result.error = "Download failed (HTTP " + std::to_string(status) + "). " + error;
+                    })
+                    .on_complete([&](std::string body, unsigned status) {
+                        if (cancel || status != 200 || body.empty()) {
+                            result.error = "No model file was returned.";
+                            return;
+                        }
+                        const auto ext = MakerWorld::lower(fs::path(download.name).extension().string());
+                        if ((ext == ".3mf" || ext == ".zip") && body.compare(0, 2, "PK") != 0) {
+                            result.error =
+                                "MakerWorld returned a web page instead of a model. Sign in or download the file in your browser.";
+                            return;
+                        }
+                        fs::ofstream file(temporary, std::ios::binary | std::ios::trunc);
+                        file.write(body.data(), static_cast<std::streamsize>(body.size()));
+                        file.close();
+                        result.ok = !file.fail();
+                        if (!result.ok)
+                            result.error = "Could not save the downloaded model.";
+                    })
+                    .perform_sync();
+            } catch (const std::exception& e) {
+                result.error = e.what();
+            }
+            return result;
+        });
+        wxProgressDialog progress("MakerWorld", _L("Downloading model..."), 100, this, wxPD_APP_MODAL | wxPD_CAN_ABORT | wxPD_AUTO_HIDE);
+        while (worker.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready) {
+            if (!progress.Update(percent.load()))
+                cancel = true;
+        }
+        const auto result = worker.get();
+        progress.Hide();
+        if (cancel || !result.ok) {
+            if (fs::exists(temporary))
+                fs::remove(temporary);
+            if (!cancel)
+                wxMessageBox(wxString::FromUTF8(result.error) + "\n\n" + _L("Try Open in browser, then Open downloaded file."),
+                             "MakerWorld", wxOK | wxICON_WARNING, this);
+            return;
+        }
+        fs::rename(temporary, destination);
+        wxGetApp().mainframe->select_tab(static_cast<size_t>(MainFrame::TabPosition::tp3DEditor));
+        if (MakerWorld::lower(destination.extension().string()) == ".3mf")
+            wxGetApp().plater()->load_project(wxString(destination.wstring()));
+        else
+            wxGetApp().plater()->load_files(std::vector<fs::path>{destination}, LoadStrategy::LoadModel);
+    } catch (const std::exception& e) {
+        wxMessageBox(wxString::FromUTF8(e.what()), "MakerWorld", wxOK | wxICON_WARNING, this);
+    }
+}
+
     ModelMallDialog::ModelMallDialog(Plater* plater /*= nullptr*/)
         :DPIFrame(nullptr, wxID_ANY, _L("3D Models"), wxDefaultPosition, wxDefaultSize, wxCLOSE_BOX|wxDEFAULT_DIALOG_STYLE|wxMAXIMIZE_BOX|wxMINIMIZE_BOX|wxRESIZE_BORDER)
     {

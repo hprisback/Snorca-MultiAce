@@ -2487,16 +2487,8 @@ static void add_common_publish_menu_items(wxMenu* publish_menu, MainFrame* mainF
             wxGetApp().open_publish_page_dialog();
         });
 
-    append_menu_item(publish_menu, wxID_ANY, _L("Download Models"), _L("Download Models"),
-        [](wxCommandEvent&) {
-            if (!wxGetApp().getAgent()) {
-                BOOST_LOG_TRIVIAL(info) << "publish: no agent";
-                return;
-}
-
-            //if (GUI::wxGetApp().plater()->model().objects.empty()) return;
-            wxGetApp().open_mall_page_dialog();
-        });
+    append_menu_item(publish_menu, wxID_ANY, "MakerWorld", _L("Browse and download models inside Snorca"),
+                     [](wxCommandEvent&) { wxGetApp().open_mall_page_dialog(); });
 #endif
 }
 

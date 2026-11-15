@@ -28,6 +28,10 @@ jobs:
         arch: [arm64, x86_64]
     steps:
       - uses: actions/checkout@v4
+      - name: Test MakerWorld links
+        run: |
+          clang++ -std=c++17 -Wall -Wextra -Isrc tests/slic3rutils/test_makerworld_url_standalone.cpp -o "$RUNNER_TEMP/test-makerworld"
+          "$RUNNER_TEMP/test-makerworld"
       # Follow the verified FOrca macOS recipe: Homebrew zstd conflicts
       # with the vendored headers. Remove it before cache compression detection.
       - name: Prepare build tools

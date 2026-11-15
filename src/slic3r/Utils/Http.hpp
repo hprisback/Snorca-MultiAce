@@ -104,7 +104,9 @@ public:
     Http& timeout_max(long timeout);
     // Exact local endpoint requests must not inherit proxy settings or follow redirects.
     Http& direct_no_redirects();
-	// Sets a maximum size of the data that can be received.
+    // Public HTTPS downloads must verify certificates and not inherit account headers.
+    Http& secure_public_download();
+    // Sets a maximum size of the data that can be received.
 	// A value of zero sets the default limit, which is is 5MB.
 	Http& size_limit(size_t sizeLimit);
 	// range  of donloaded bytes. example: curl_easy_setopt(curl, CURLOPT_RANGE, "0-199");

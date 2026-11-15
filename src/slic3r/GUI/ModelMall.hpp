@@ -41,6 +41,23 @@
 
 namespace Slic3r { namespace GUI {
 
+// Separate remote view: never connected to the local Flutter/printer bridge.
+class MakerWorldPanel : public wxPanel
+{
+public:
+    explicit MakerWorldPanel(wxWindow* parent);
+    void open_home();
+
+private:
+    void          on_navigation(wxWebViewEvent& event);
+    void          on_new_window(wxWebViewEvent& event);
+    void          on_message(wxWebViewEvent& event);
+    void          download_and_open(const std::string& payload);
+    wxWebView*    m_view{nullptr};
+    wxStaticText* m_status{nullptr};
+    bool          m_downloading{false};
+};
+
     class ModelMallDialog : public DPIFrame
     {
     public:
