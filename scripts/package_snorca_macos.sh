@@ -32,7 +32,7 @@ python3 scripts/verify_macos_bundle.py "$app" "$arch" | tee dist/bundle-audit.tx
 # Ad-hoc signatures validate bundle integrity on Apple Silicon. This is not
 # Developer ID signing or Apple notarization; Gatekeeper may still block it.
 while IFS= read -r -d '' file_path; do
-    if file -b "$file_path" | grep -q 'Mach-O'; then
+    if [[ "$(file -b "$file_path")" == *Mach-O* ]]; then
         codesign --force --sign - "$file_path"
     fi
 done < <(find "$app" -type f -print0)
