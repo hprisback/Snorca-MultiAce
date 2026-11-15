@@ -18,6 +18,7 @@
 #include <wx/progdlg.h>
 #include <wx/stdpaths.h>
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 
 namespace Slic3r {
 namespace GUI {
@@ -163,7 +164,7 @@ void MakerWorldPanel::download_and_open(const std::string& payload)
             folder = fs::path(wxStandardPaths::Get().GetUserDir(wxStandardPaths::Dir_Downloads).ToStdWstring());
         folder /= "MakerWorld";
         fs::create_directories(folder);
-        const fs::path    destination = folder / fs::unique_path("%%%%-%%%%-%%%%").string().append("-").append(download.name);
+        const fs::path    destination = folder / (fs::unique_path("%%%%-%%%%-%%%%").string() + "-" + download.name);
         const fs::path    temporary   = destination.string() + ".download";
         std::atomic<bool> cancel{false};
         std::atomic<int>  percent{0};

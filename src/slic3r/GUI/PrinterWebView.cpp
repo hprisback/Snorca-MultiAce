@@ -129,7 +129,7 @@ void show_camera_frame(const std::string& url)
             evt.Skip(false);
         });
         s_camera_frame->CenterOnParent();
-    } else if (auto view = dynamic_cast<wxWebView*>(s_camera_frame->FindWindowByName("live_camera_view"))) {
+    } else if (auto view = dynamic_cast<wxWebView*>(s_camera_frame->FindWindow("live_camera_view"))) {
         if (view->GetCurrentURL() != wxString::FromUTF8(url))
             view->LoadURL(wxString::FromUTF8(url));
     }
