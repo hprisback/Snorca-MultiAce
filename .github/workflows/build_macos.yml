@@ -20,12 +20,16 @@ env:
 jobs:
   build:
     name: macOS (${{ matrix.arch }})
-    runs-on: macos-14
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 350
     strategy:
       fail-fast: false
       matrix:
-        arch: [arm64, x86_64]
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - name: Test MakerWorld links
@@ -54,7 +58,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: deps/build/${{ matrix.arch }}/OrcaSlicer_dep
-          key: snorca-macos14-v1-${{ matrix.arch }}-${{ env.OSX_DEPLOYMENT_TARGET }}-${{ env.CMAKE_PIN }}-${{ steps.depkey.outputs.hash }}
+          key: snorca-macos15-v1-${{ matrix.arch }}-${{ env.OSX_DEPLOYMENT_TARGET }}-${{ env.CMAKE_PIN }}-${{ steps.depkey.outputs.hash }}
 
       - name: Build dependencies
         if: steps.deps.outputs.cache-hit != 'true'
@@ -83,7 +87,6 @@ jobs:
         run: bash scripts/package_snorca_macos.sh "$TARGET_ARCH"
 
       - name: Smoke test native executable
-        if: matrix.arch == 'arm64'
         run: |
           python3 - <<'PY'
           import subprocess
