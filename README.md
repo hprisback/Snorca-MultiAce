@@ -1,5 +1,7 @@
 # Snorca MultiAce
 
+> **Mac build fork:** This fork adds a manual [macOS build workflow](../../actions/workflows/build_macos.yml) for Apple Silicon and Intel. See [Mac installation and build notes](docs/MACOS.md). These builds are experimental, ad-hoc signed, and not Apple notarized. Original Snorca features and credits are preserved below.
+
 **A custom fork of the Snapmaker Orca slicer, for the Snapmaker U1 with the multiACE add-on.**
 
 It makes ACE colour printing on the U1 simple: pick your printer, the slicer reads what is loaded, and Print does the rest.
@@ -84,7 +86,7 @@ Get the files from the **[Releases page](https://github.com/Mnemonic3D/Snorca-Mu
 |---|---|
 | **Linux** (64-bit) | The `...linux-x86_64.tar.xz` file. Unpack it and run `AppRun`. |
 | **Windows** (64-bit) | The installer `.exe` or the portable `.zip`. New and lightly tested; Windows shows an "unknown publisher" warning. |
-| **Mac** | Not planned for now. |
+| **Mac** (macOS 12+) | This fork: download a completed ARM64 or Intel workflow artifact. [Instructions](docs/MACOS.md). |
 | **Touch-screen label installer** (optional) | Windows: the `...ACE-screen-label-installer-EXPERIMENTAL-windows-x64.exe` file. Linux: the `...ACE-screen-label-installer-EXPERIMENTAL-linux-x64` file; make it executable (`chmod +x`) and run it. One file, nothing to install on your PC. Windows shows an "unknown publisher" warning. |
 
 ## Where it stands

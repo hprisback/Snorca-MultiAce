@@ -1,0 +1,105 @@
+name: Build Snorca for Mac
+
+# Manual builds only. No release publishing and no signing secrets required.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snorca-macos-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  OSX_DEPLOYMENT_TARGET: "12.0"
+  CMAKE_PIN: "3.31.6"
+  CMAKE_BUILD_PARALLEL_LEVEL: "3"
+  BUILD_CONFIG: Release
+
+jobs:
+  build:
+    name: macOS (${{ matrix.arch }})
+    runs-on: macos-14
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x86_64]
+    steps:
+      - uses: actions/checkout@v4
+      # Follow the verified FOrca macOS recipe: Homebrew zstd conflicts
+      # with the vendored headers. Remove it before cache compression detection.
+      - name: Prepare build tools
+        run: |
+          brew uninstall --ignore-dependencies zstd || true
+          brew install ninja automake autoconf libtool texinfo gettext
+          echo "$(brew --prefix gettext)/bin" >> "$GITHUB_PATH"
+          curl --fail --location --retry 3 \
+            "https://cmake.org/files/v3.31/cmake-${CMAKE_PIN}-macos-universal.tar.gz" \
+            -o "$RUNNER_TEMP/cmake.tar.gz"
+          tar -xzf "$RUNNER_TEMP/cmake.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/cmake-${CMAKE_PIN}-macos-universal/CMake.app/Contents/bin" >> "$GITHUB_PATH"
+
+      - name: Compute dependency cache key
+        id: depkey
+        run: echo "hash=${{ hashFiles('deps/**/CMakeLists.txt', 'deps/**/*.cmake', 'deps/**/*.patch', '!deps/build/**') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore dependencies
+        id: deps
+        uses: actions/cache/restore@v4
+        with:
+          path: deps/build/${{ matrix.arch }}/OrcaSlicer_dep
+          key: snorca-macos14-v1-${{ matrix.arch }}-${{ env.OSX_DEPLOYMENT_TARGET }}-${{ env.CMAKE_PIN }}-${{ steps.depkey.outputs.hash }}
+
+      - name: Build dependencies
+        if: steps.deps.outputs.cache-hit != 'true'
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          cmake --version
+          msgfmt --version
+          bash build_release_macos.sh -d -a "$TARGET_ARCH" -t "$OSX_DEPLOYMENT_TARGET" -T
+
+      - name: Save dependencies
+        if: steps.deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: deps/build/${{ matrix.arch }}/OrcaSlicer_dep
+          key: ${{ steps.deps.outputs.cache-primary-key }}
+
+      - name: Build slicer
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: bash build_release_macos.sh -s -x -a "$TARGET_ARCH" -t "$OSX_DEPLOYMENT_TARGET" -T
+
+      - name: Validate and package installer
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: bash scripts/package_snorca_macos.sh "$TARGET_ARCH"
+
+      - name: Smoke test native executable
+        if: matrix.arch == 'arm64'
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          result = subprocess.run(
+              ["dist/staging/Snorca MultiAce.app/Contents/MacOS/FOrcaSlicer", "--help"],
+              timeout=90, capture_output=True, text=True)
+          print(result.stdout)
+          print(result.stderr)
+          if result.returncode:
+              raise SystemExit(result.returncode)
+          PY
+
+      - name: Upload Mac installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Snorca-MultiAce-macOS-${{ matrix.arch }}
+          path: |
+            dist/*.dmg
+            dist/*.sha256
+            dist/BUILD-INFO.txt
+            dist/bundle-audit.txt
+          if-no-files-found: error
+          retention-days: 30
