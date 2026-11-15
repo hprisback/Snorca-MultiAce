@@ -28,8 +28,6 @@ jobs:
         include:
           - arch: arm64
             runner: macos-15
-          - arch: x86_64
-            runner: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - name: Test MakerWorld links
@@ -37,9 +35,9 @@ jobs:
           clang++ -std=c++17 -Wall -Wextra -Isrc tests/slic3rutils/test_makerworld_url_standalone.cpp -o "$RUNNER_TEMP/test-makerworld"
           "$RUNNER_TEMP/test-makerworld"
       # Follow the verified FOrca macOS recipe: Homebrew zstd conflicts
-      # with the vendored headers. Remove it before cache compression detection.
-      # It must be removed LAST: Homebrew's curl links against libzstd, so
-      # uninstalling it first breaks `brew install` and any curl download.
+      # with the vendored headers, so hide it before cache compression detection.
+      # Unlink (not uninstall): Homebrew's curl/libcurl, used by brew and git,
+      # load libzstd from the opt prefix, which `brew unlink` keeps in place.
       - name: Prepare build tools
         run: |
           brew install ninja automake autoconf libtool texinfo gettext
@@ -49,7 +47,7 @@ jobs:
             -o "$RUNNER_TEMP/cmake.tar.gz"
           tar -xzf "$RUNNER_TEMP/cmake.tar.gz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/cmake-${CMAKE_PIN}-macos-universal/CMake.app/Contents/bin" >> "$GITHUB_PATH"
-          brew uninstall --ignore-dependencies zstd || true
+          brew unlink zstd || true
 
       - name: Compute dependency cache key
         id: depkey
