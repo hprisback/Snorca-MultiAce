@@ -34,6 +34,8 @@ jobs:
         run: |
           clang++ -std=c++17 -Wall -Wextra -Isrc tests/slic3rutils/test_makerworld_url_standalone.cpp -o "$RUNNER_TEMP/test-makerworld"
           "$RUNNER_TEMP/test-makerworld"
+          clang++ -std=c++17 -Wall -Wextra -Isrc tests/slic3rutils/test_webcam_url_standalone.cpp -o "$RUNNER_TEMP/test-webcam"
+          "$RUNNER_TEMP/test-webcam"
       # Follow the verified FOrca macOS recipe: Homebrew zstd conflicts
       # with the vendored headers, so hide it before cache compression detection.
       # Unlink (not uninstall): Homebrew's curl/libcurl, used by brew and git,

@@ -48,8 +48,14 @@ public:
     void sendMessage(const std::string& msg);
     wxWebView* get_browser() const { return m_browser; }
 
+    // Opens the extended firmware's 30 fps player (http://<printer>/webcam/player)
+    // in an app window. With only_if_available, it first checks that the printer
+    // serves that page, so stock firmware keeps its built-in camera view.
+    static void open_live_camera(const std::string& printer_host, bool only_if_available);
+
 private:
     void SendAPIKey();
+    void on_live_camera_button();
 
     wxWebView* m_browser;
     long m_zoomFactor;

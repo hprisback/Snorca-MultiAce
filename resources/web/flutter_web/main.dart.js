@@ -139875,19 +139875,17 @@ p=s==null?q.d:s}s=p==null?null:A.kn(p)
 A.d(B.p,"\u6444\u5f71\u6a21\u5757\u95ee\u9898\u6392\u67e5: [\u4e32\u884c\u8bf7\u6c42] \u5f00\u59cb\u8bf7\u6c42\u4e0b\u4e00\u5f20\u56fe\u7247, \u5b9e\u9645\u8bf7\u6c42\u7c7b\u578b="+r+", url="+A.c(s),!0)
 s=o.a.d
 s.toString
-o.__fpsT=Date.now()
 o.abx(s)},
 aaZ(){var s,r=this
 if(r.k3){A.d(B.p,"\u6444\u5f71\u6a21\u5757\u95ee\u9898\u6392\u67e5: [\u4e32\u884c\u8bf7\u6c42] \u56fe\u7247\u52a0\u8f7d\u5b8c\u6210\u4f46\u5e94\u7528\u5728\u540e\u53f0, \u505c\u6b62\u8bf7\u6c42\u94fe",!0)
 r.k1=B.c0
 return}if(r.c==null||r.r!==B.cA){r.k1=B.c0
 return}r.k1=B.zw
-s=r.a.c?new A.bh(Math.max(0,33333-(Date.now()-(r.__fpsT||0))*1000)):B.eu
-A.d(B.p,"\u6444\u5f71\u6a21\u5757\u95ee\u9898\u6392\u67e5: [\u4e32\u884c\u8bf7\u6c42] \u56fe\u7247\u52a0\u8f7d\u5b8c\u6210, \u7b49\u5f85"+B.e.cg(s.a,1000)+"ms\u540e\u8bf7\u6c42\u4e0b\u4e00\u5f20",!0)
-var fpsDelay=s
+A.d(B.p,"\u6444\u5f71\u6a21\u5757\u95ee\u9898\u6392\u67e5: [\u4e32\u884c\u8bf7\u6c42] \u56fe\u7247\u52a0\u8f7d\u5b8c\u6210, \u7b49\u5f85"+B.e.cg((r.a.c?B.bw:B.eu).a,1000)+"ms\u540e\u8bf7\u6c42\u4e0b\u4e00\u5f20",!0)
 s=r.k2
 if(s!=null)s.K(0)
-r.k2=A.cp(fpsDelay,new A.beM(r))},
+s=r.a.c?B.bw:B.eu
+r.k2=A.cp(s,new A.beM(r))},
 a9p(){var s,r=this
 r.M(new A.beK(r))
 s=r.e

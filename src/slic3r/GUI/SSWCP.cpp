@@ -2,6 +2,7 @@
 #include "SSWCP.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
+#include "PrinterWebView.hpp"
 #include "DownloadManager.hpp"
 #include "nlohmann/json.hpp"
 #include "slic3r/GUI/Tab.hpp"
@@ -3292,6 +3293,9 @@ void SSWCP_MachineOption_Instance::sw_CameraStartMonitor() {
             int interval = m_param_data.count("interval") ? m_param_data["interval"].get<int>() : 2;
 
             bool expect_pw = m_param_data.count("expect_pw") ? m_param_data["expect_pw"].get<bool>() : false;
+
+            // Extended firmware serves a 30 fps player; show it when the printer has one.
+            PrinterWebView::open_live_camera(host->get_host(), true);
 
             auto weak_self = std::weak_ptr<SSWCP_Instance>(shared_from_this());
             host->async_camera_start(domain, interval, expect_pw, [weak_self](const json& response) {
