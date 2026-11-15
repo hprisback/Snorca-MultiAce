@@ -42,7 +42,7 @@ jobs:
       # load libzstd from the opt prefix, which `brew unlink` keeps in place.
       - name: Prepare build tools
         run: |
-          brew install ninja automake autoconf libtool texinfo gettext
+          brew install ninja automake autoconf libtool texinfo gettext ccache
           echo "$(brew --prefix gettext)/bin" >> "$GITHUB_PATH"
           CMAKE_TGZ="cmake-${CMAKE_PIN}-macos-universal.tar.gz"
           /usr/bin/curl --fail --location --retry 3 \
@@ -82,10 +82,41 @@ jobs:
           path: deps/build/${{ matrix.arch }}/OrcaSlicer_dep
           key: ${{ steps.deps.outputs.cache-primary-key }}
 
+      # Compiler cache: each run starts on a fresh machine, so without this
+      # every source file is recompiled. Only changed files rebuild with it.
+      - name: Restore compiler cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: snorca-ccache-v1-${{ matrix.arch }}-${{ github.run_id }}
+          restore-keys: snorca-ccache-v1-${{ matrix.arch }}-
+
       - name: Build slicer
         env:
           TARGET_ARCH: ${{ matrix.arch }}
-        run: bash build_release_macos.sh -s -x -a "$TARGET_ARCH" -t "$OSX_DEPLOYMENT_TARGET" -T
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+          CCACHE_BASEDIR: ${{ github.workspace }}
+          CCACHE_MAXSIZE: 3G
+          # Needed for precompiled headers (SLIC3R_PCH) to be cacheable.
+          CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
+          CFLAGS: -Xclang -fno-pch-timestamp
+          CXXFLAGS: -Xclang -fno-pch-timestamp
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+          CMAKE_OBJC_COMPILER_LAUNCHER: ccache
+          CMAKE_OBJCXX_COMPILER_LAUNCHER: ccache
+        run: |
+          ccache --zero-stats
+          bash build_release_macos.sh -s -x -a "$TARGET_ARCH" -t "$OSX_DEPLOYMENT_TARGET" -T
+          ccache --show-stats
+
+      # Saved even when a later step fails, so the next run keeps the progress.
+      - name: Save compiler cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: snorca-ccache-v1-${{ matrix.arch }}-${{ github.run_id }}
 
       - name: Validate and package installer
         env:
