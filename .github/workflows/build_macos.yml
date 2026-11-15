@@ -38,16 +38,18 @@ jobs:
           "$RUNNER_TEMP/test-makerworld"
       # Follow the verified FOrca macOS recipe: Homebrew zstd conflicts
       # with the vendored headers. Remove it before cache compression detection.
+      # It must be removed LAST: Homebrew's curl links against libzstd, so
+      # uninstalling it first breaks `brew install` and any curl download.
       - name: Prepare build tools
         run: |
-          brew uninstall --ignore-dependencies zstd || true
           brew install ninja automake autoconf libtool texinfo gettext
           echo "$(brew --prefix gettext)/bin" >> "$GITHUB_PATH"
-          curl --fail --location --retry 3 \
+          /usr/bin/curl --fail --location --retry 3 \
             "https://cmake.org/files/v3.31/cmake-${CMAKE_PIN}-macos-universal.tar.gz" \
             -o "$RUNNER_TEMP/cmake.tar.gz"
           tar -xzf "$RUNNER_TEMP/cmake.tar.gz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/cmake-${CMAKE_PIN}-macos-universal/CMake.app/Contents/bin" >> "$GITHUB_PATH"
+          brew uninstall --ignore-dependencies zstd || true
 
       - name: Compute dependency cache key
         id: depkey
